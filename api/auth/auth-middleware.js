@@ -1,4 +1,5 @@
 const User = require("../users/users-model");
+
 /*
   If the user does not have a session saved in the server
 
@@ -11,11 +12,12 @@ function restricted(req, res, next) {
   if (req.session.user) {
     next();
   } else {
-    res.status(401).json({ message: "You shall not pass!" });
+    next({
+      status: 401,
+      message: `You shall not pass!`,
+    });
   }
-  next();
 }
-
 /*
   If the username in req.body already exists in the database
 
@@ -24,20 +26,20 @@ function restricted(req, res, next) {
     "message": "Username taken"
   }
 */
-async function checkUsernameFree(req, res, next) {
+function checkUsernameFree(req, res, next) {
   const username = req.body.username;
-  try {
-    const dataUsername = await User.findBy(username);
-    if (dataUsername) {
-      res.status(422).json({ message: "Username taken" });
-    } else {
-      next();
-    }
-  } catch (err) {
-    next(err);
-  }
+  User.findBy({ username })
+    .then((user) => {
+      if (user.length) {
+        res.status(422).json({
+          message: "Username taken",
+        });
+      } else {
+        next();
+      }
+    })
+    .catch(next);
 }
-
 /*
   If the username in req.body does NOT exist in the database
 
@@ -49,9 +51,12 @@ async function checkUsernameFree(req, res, next) {
 async function checkUsernameExists(req, res, next) {
   const username = req.body.username;
   try {
-    const dataUsername = await User.findBy(username);
-    if (!dataUsername) {
-      res.status(401).json({ message: "Invalid credentials" });
+    const user = await User.findBy({ username });
+    if (!user.length) {
+      next({ status: 401, message: "Invalid credentials" });
+    } else {
+      req.user = user[0];
+      next();
     }
   } catch (err) {
     next(err);
@@ -68,8 +73,10 @@ async function checkUsernameExists(req, res, next) {
 */
 function checkPasswordLength(req, res, next) {
   const password = req.body.password;
-  if (!password || password.trim().legnth < 3) {
-    res.status(422).json({ message: "Password must be longer than 3 chars" });
+  if (!password || password.trim().length < 3) {
+    res.status(422).json({
+      message: `Password must be longer than 3 chars`,
+    });
   } else {
     next();
   }

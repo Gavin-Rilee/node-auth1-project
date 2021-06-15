@@ -1,16 +1,13 @@
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
-const session = require('express-session');
-const Store = require('connect-session-knex')(session);
+const session = require("express-session");
+const Store = require("connect-session-knex")(session);
 
-
+const authRouter = require("./auth/auth-router");
+const usersRouter = require("./users/users-router.js");
 const server = express();
-const authRouter = require('./auth/auth-router');
-const usersRouter = require('./users/users-router.js');
 
-server.use('/api/users', usersRouter);
-server.use('/api/auth', authRouter);
 /**
  Do what needs to be done to support sessions with the `express-session` package!
  To respect users' privacy, do NOT send them a cookie unless they log in.
@@ -23,34 +20,40 @@ server.use('/api/auth', authRouter);
  The session can be persisted in memory (would not be adecuate for production)
  or you can use a session store like `connect-session-knex`.
  */
+
+server.use(
+  session({
+    name: "chocolatechip",
+    secret: "shhhh im not telling you",
+    cookie: {
+      maxAge: 1000 * 60 * 60,
+      secure: false,
+      httpOnly: true,
+    },
+    resave: false,
+    saveUninitialized: false,
+    store: new Store({
+      knex: require("../data/db-config"),
+      tableName: "sessions",
+      sidfieldname: "sid",
+      createTable: true,
+      clearInterval: 1000 * 60 * 60,
+    }),
+  })
+);
+
 server.use(helmet());
 server.use(express.json());
 server.use(cors());
+server.use("/api/users", usersRouter);
+server.use("/api/auth", authRouter);
 
-server.use(session({
-  name: 'chocolatechip',
-  secret: 'shhhh im not telling you',
-  cookie: {
-    maxAge:1000 * 60 * 60,
-    secure: false,
-    httpOnly: false,
-  },
-  resave: false,
-  saveUninitialized:false,
-  store: new Store({
-    knex: require('../data/db-config'),
-    tableName: 'sessions',
-    sidfieldname: 'sid',
-    createtable: true,
-    clearInterval: 1000 * 60 * 60,
-  }) 
-}))
-
-server.get("/", (req, res) => {
-  res.json({ api: "up" });
+server.use("*", (req, res) => {
+  res.status(404).json({ message: "not found!" });
 });
 
-server.use((err, req, res, next) => { // eslint-disable-line
+server.use((err, req, res, next) => {
+  // eslint-disable-line
   res.status(err.status || 500).json({
     message: err.message,
     stack: err.stack,
